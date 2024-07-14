@@ -52,8 +52,11 @@ func (ep ExprParser) nextToken(expr string) (string, error) {
 	}
 
 	for i, c := range expr {
-		if isTokenTerminator(c) || i == len(expr)-1 {
+		if isTokenTerminator(c) {
 			return expr[:i], nil
+		}
+		if i == len(expr)-1 {
+			return expr, nil
 		}
 	}
 
@@ -341,7 +344,6 @@ func (ep ExprParser) parseStrSliceExpr(expr string) (StrSliceExpr, int, error) {
 // Parse a uint slice literal.
 func (ep ExprParser) parseUintSliceExpr(expr string) (UintSliceExpr, int, error) {
 	precondition(len(expr) > len("[]uint"))
-
 	consumed := len("[]uint")
 
 	// Consume the opening brace
@@ -377,8 +379,7 @@ func (ep ExprParser) parseExpressionSequence(expr string, terminator byte, token
 		// Consume the closing brace
 		if expr[consumed] == terminator {
 			if vTerm {
-				consumed++
-				break
+				return exprs, consumed + 1, nil
 			} else {
 				return nil, 0, errors.New("invalid terminator for expression sequence")
 			}

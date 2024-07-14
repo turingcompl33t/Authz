@@ -1,7 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"refl/internal/authz"
+)
 
 func main() {
-	fmt.Println("expr")
+	p := authz.ExprParser{}
+	p.Parse("[]uint{123")
 }

@@ -226,14 +226,14 @@ func TestParseUintSlice(t *testing.T) {
 		want        Expr
 		expectError error
 	}{
-		// {"", nil, errors.New("")},
-		// {"[]uint{}", UintSliceExpr{[]Expr{}}, nil},
-		// {"[]uint{123}", UintSliceExpr{[]Expr{UintExpr{123}}}, nil},
-		// {"[]uint{123, 456}", UintSliceExpr{[]Expr{UintExpr{123}, UintExpr{456}}}, nil},
-		// {"[]uint{123,}", nil, errors.New("")},
+		{"", nil, errors.New("")},
+		{"[]uint{}", UintSliceExpr{[]Expr{}}, nil},
+		{"[]uint{123}", UintSliceExpr{[]Expr{UintExpr{123}}}, nil},
+		{"[]uint{123, 456}", UintSliceExpr{[]Expr{UintExpr{123}, UintExpr{456}}}, nil},
+		{"[]uint{123,}", nil, errors.New("")},
 		{"[]uint{123", nil, errors.New("")},
-		// {"[]uint{'foo'}", nil, errors.New("")},
-		// {"[]uint{true}", nil, errors.New("")},
+		{"[]uint{'foo'}", nil, errors.New("")},
+		{"[]uint{true}", nil, errors.New("")},
 	}
 	for _, d := range data {
 		t.Run(d.input, func(t *testing.T) {
