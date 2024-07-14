@@ -2,7 +2,6 @@ package authz
 
 import (
 	"fmt"
-	"reflect"
 )
 
 type Expr interface {
@@ -108,20 +107,37 @@ func (e EqExpr) Eval(env map[string]interface{}) (interface{}, error) {
 		return false, err
 	}
 
-	if !sameType(left, right) {
-		return false, fmt.Errorf("mismatched types in equality comparison: %T != %T", left, right)
+	asStr, err := coerceStr(left)
+	if err == nil {
+		rAsStr, err := coerceStr(right)
+		if err == nil {
+			return asStr == rAsStr, nil
+		} else {
+			return nil, fmt.Errorf("mismatched types in equality comparison: %T != %T", left, right)
+		}
 	}
 
-	switch left.(type) {
-	case string:
-		return left.(string) == right.(string), nil
-	case uint:
-		return left.(uint) == right.(uint), nil
-	case bool:
-		return left.(bool) == right.(bool), nil
-	default:
-		return false, fmt.Errorf("unsupported type in equality comparison: %T", left)
+	asUint, err := coerceUint(left)
+	if err == nil {
+		rAsUint, err := coerceUint(right)
+		if err == nil {
+			return asUint == rAsUint, nil
+		} else {
+			return nil, fmt.Errorf("mismatched types in equality comparison: %T != %T", left, right)
+		}
 	}
+
+	asBool, err := coerceBool(left)
+	if err == nil {
+		rAsBool, err := coerceBool(right)
+		if err == nil {
+			return asBool == rAsBool, nil
+		} else {
+			return nil, fmt.Errorf("mismatched types in equality comparison: %T != %T", left, right)
+		}
+	}
+
+	return nil, fmt.Errorf("unsupported type in equality comparison: %T", left)
 }
 
 func (e EqExpr) Equal(other Expr) bool {
@@ -131,10 +147,6 @@ func (e EqExpr) Equal(other Expr) bool {
 	}
 
 	return e.Left.Equal(otherEq.Left) && e.Right.Equal(otherEq.Right)
-}
-
-func sameType(a, b interface{}) bool {
-	return reflect.TypeOf(a) == reflect.TypeOf(b)
 }
 
 // ----------------------------------------------------------------------------

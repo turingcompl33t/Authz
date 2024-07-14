@@ -9,7 +9,7 @@ import (
 const (
 	NA     = "na"
 	String = "string"
-	Int    = "int"
+	Uint   = "uint"
 	Bool   = "bool"
 )
 
@@ -44,7 +44,7 @@ func TestEvalBools(t *testing.T) {
 				}
 			}
 
-			b, err := AsBool(got)
+			b, err := coerceBool(got)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -86,7 +86,7 @@ func TestEvalString(t *testing.T) {
 				}
 			}
 
-			s, err := AsString(got)
+			s, err := coerceStr(got)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -128,7 +128,7 @@ func TestEvalInt(t *testing.T) {
 				}
 			}
 
-			i, err := AsInt(got)
+			i, err := coerceUint(got)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -179,7 +179,7 @@ func TestEvalEq(t *testing.T) {
 				}
 			}
 
-			b, err := AsBool(got)
+			b, err := coerceBool(got)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -201,7 +201,7 @@ func TestEvalVariableRef(t *testing.T) {
 		expectError error
 	}{
 		{VariableRefExpr{"foo"}, map[string]interface{}{"foo": "bar"}, "bar", String, nil},
-		{VariableRefExpr{"foo"}, map[string]interface{}{"foo": 42}, 42, Int, nil},
+		{VariableRefExpr{"foo"}, map[string]interface{}{"foo": 42}, 42, Uint, nil},
 		{VariableRefExpr{"foo"}, map[string]interface{}{"foo": true}, true, Bool, nil},
 		{VariableRefExpr{"foo"}, map[string]interface{}{}, nil, NA, errors.New("")},
 		{VariableRefExpr{"foo"}, map[string]interface{}{"bar": "baz"}, nil, NA, errors.New("")},
@@ -278,12 +278,12 @@ func TestEvalStructFieldRef(t *testing.T) {
 func coerceAndCmp(want, got interface{}, wantType string) error {
 	switch wantType {
 	case String:
-		w, err := AsString(want)
+		w, err := coerceStr(want)
 		if err != nil {
 			return errors.New("specified the wrong wantType")
 		}
 
-		g, err := AsString(got)
+		g, err := coerceStr(got)
 		if err != nil {
 			return fmt.Errorf("got the wrong type; expected string")
 		}
@@ -293,16 +293,17 @@ func coerceAndCmp(want, got interface{}, wantType string) error {
 		}
 
 		return nil
-	case Int:
-		w, err := AsInt(want)
+	case Uint:
+		w, err := coerceUint(want)
 		if err != nil {
+			fmt.Println(err)
 			return errors.New("specified the wrong wantType")
 		}
 
-		g, err := AsInt(got)
+		g, err := coerceUint(got)
 		if err != nil {
 			fmt.Println(err)
-			return fmt.Errorf("got the wrong type; expected int")
+			return fmt.Errorf("got the wrong type; expected uint")
 		}
 
 		if w != g {
@@ -311,12 +312,12 @@ func coerceAndCmp(want, got interface{}, wantType string) error {
 
 		return nil
 	case Bool:
-		w, err := AsBool(want)
+		w, err := coerceBool(want)
 		if err != nil {
 			return errors.New("specified the wrong wantType")
 		}
 
-		g, err := AsBool(got)
+		g, err := coerceBool(got)
 		if err != nil {
 			return fmt.Errorf("got the wrong type; expected bool")
 		}
