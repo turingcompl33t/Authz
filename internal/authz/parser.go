@@ -38,6 +38,8 @@ func (ep ExprParser) parseExpr(expr string) (Expr, int, error) {
 	switch token {
 	case "$eq":
 		return ep.parseEqExpr(expr)
+	case "$in":
+		return ep.parseInExpr(expr)
 	default:
 		return ep.parseNonOperator(expr)
 	}
@@ -62,42 +64,21 @@ func (ep ExprParser) nextToken(expr string) (string, error) {
 // Operator Expressions
 // ----------------------------------------------------------------------------
 
+// Parse an equality expression.
 func (ep ExprParser) parseEqExpr(expr string) (EqExpr, int, error) {
 	precondition(len(expr) > len("$eq"))
 
 	if len(expr) < len("$eq(") || expr[:len("$eq(")] != "$eq(" {
 		return EqExpr{}, 0, errors.New("expected '$eq('")
 	}
-
 	consumed := len("$eq(")
 
-	left, n, err := ep.parseExpr(expr[consumed:])
+	left, right, n, err := ep.parseExpressionPair(expr[consumed:])
 	if err != nil {
 		return EqExpr{}, 0, err
 	}
-
 	consumed += n
-	if len(expr[consumed:]) == 0 {
-		return EqExpr{}, 0, errors.New("unexpected end of input")
-	}
 
-	// Consume the comma
-	if expr[consumed] != ',' {
-		return EqExpr{}, 0, errors.New("expected ','")
-	}
-	consumed++
-
-	// Consume whitespace
-	for consumed < len(expr) && expr[consumed] == ' ' {
-		consumed++
-	}
-
-	right, n, err := ep.parseExpr(expr[consumed:])
-	if err != nil {
-		return EqExpr{}, 0, err
-	}
-
-	consumed += n
 	if len(expr[consumed:]) == 0 {
 		return EqExpr{}, 0, errors.New("unexpected end of input")
 	}
@@ -109,6 +90,66 @@ func (ep ExprParser) parseEqExpr(expr string) (EqExpr, int, error) {
 	consumed++
 
 	return EqExpr{Left: left, Right: right}, consumed, nil
+}
+
+// Parse an in expression.
+func (ep ExprParser) parseInExpr(expr string) (InExpr, int, error) {
+	precondition(len(expr) > len("$in"))
+
+	if len(expr) < len("$in(") || expr[:len("$in(")] != "$in(" {
+		return InExpr{}, 0, errors.New("expected '$in('")
+	}
+	consumed := len("$in(")
+
+	query, collection, n, err := ep.parseExpressionPair(expr[consumed:])
+	if err != nil {
+		return InExpr{}, 0, err
+	}
+	consumed += n
+
+	if len(expr[consumed:]) == 0 {
+		return InExpr{}, 0, errors.New("unexpected end of input")
+	}
+
+	// Consume the closing parenthesis
+	if expr[consumed] != ')' {
+		return InExpr{}, 0, errors.New("expected ')'")
+	}
+	consumed++
+
+	return InExpr{Element: query, Collection: collection}, consumed, nil
+}
+
+// Parse a pair of expressions, separated by comma and optional whitespace
+func (ep ExprParser) parseExpressionPair(expr string) (Expr, Expr, int, error) {
+	left, n, err := ep.parseExpr(expr)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+
+	consumed := n
+	if len(expr[consumed:]) == 0 {
+		return nil, nil, 0, errors.New("unexpected end of input")
+	}
+
+	// Consume the comma
+	if expr[consumed] != ',' {
+		return nil, nil, 0, errors.New("expected ','")
+	}
+	consumed++
+
+	// Consume whitespace
+	for consumed < len(expr) && expr[consumed] == ' ' {
+		consumed++
+	}
+
+	right, n, err := ep.parseExpr(expr[consumed:])
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	consumed += n
+
+	return left, right, consumed, nil
 }
 
 // ----------------------------------------------------------------------------
@@ -129,9 +170,23 @@ func (ep ExprParser) parseNonOperator(expr string) (Expr, int, error) {
 		// String literal
 		return ep.parseStringExpr(expr)
 	} else if unicode.IsDigit(rune(expr[0])) {
-		fmt.Println("parsing int")
 		// Integer literal
-		return ep.parseIntExpr(expr)
+		return ep.parseUintExpr(expr)
+	} else if expr[0] == '[' {
+		// Slice literal
+		if len(expr) < len("[]") || expr[:len("[]")] != "[]" {
+			return nil, 0, errors.New("expected '[]'")
+		}
+
+		if len(expr) > len("[]bool") && expr[:len("[]bool")] == "[]bool" {
+			return ep.parseBoolSliceExpr(expr)
+		} else if len(expr) > len("[]string") && expr[:len("[]string")] == "[]string" {
+			return ep.parseStrSliceExpr(expr)
+		} else if len(expr) > len("[]uint") && expr[:len("[]uint")] == "[]uint" {
+			return ep.parseUintSliceExpr(expr)
+		} else {
+			return nil, 0, errors.New("expected 'bool', 'string', or 'uint' for slice literal")
+		}
 	} else {
 		return ep.parseNonLiteral(expr)
 	}
@@ -182,7 +237,10 @@ func (ep ExprParser) parseFalseExpr(expr string) (FalseExpr, int, error) {
 // Parse a string literal expression
 func (ep ExprParser) parseStringExpr(expr string) (StringExpr, int, error) {
 	precondition(len(expr) > 0)
-	precondition(expr[0] == '\'')
+
+	if expr[0] != '\'' {
+		return StringExpr{}, 0, errors.New("expected '")
+	}
 
 	for i, c := range expr[1:] {
 		if c == '\'' {
@@ -193,35 +251,169 @@ func (ep ExprParser) parseStringExpr(expr string) (StringExpr, int, error) {
 	return StringExpr{}, 0, errors.New("expected closing '")
 }
 
-func (ep ExprParser) parseIntExpr(expr string) (IntExpr, int, error) {
+func (ep ExprParser) parseUintExpr(expr string) (UintExpr, int, error) {
 	for i, c := range expr {
 		if isTokenTerminator(c) {
 			v, err := strconv.ParseUint(expr[:i], 10, 32)
 			if err != nil {
-				return IntExpr{}, 0, errors.New("invalid integer literal")
+				return UintExpr{}, 0, errors.New("invalid integer literal")
 			}
-			return IntExpr{Value: uint(v)}, i, nil
+			return UintExpr{Value: uint(v)}, i, nil
 		}
 
 		// The literal consumed the entire raw expression
 		if i == len(expr)-1 {
 			if !unicode.IsDigit(c) {
-				return IntExpr{}, 0, errors.New("expected digit")
+				return UintExpr{}, 0, errors.New("expected digit")
 			} else {
 				v, err := strconv.ParseUint(expr, 10, 32)
 				if err != nil {
-					return IntExpr{}, 0, errors.New("invalid integer literal")
+					return UintExpr{}, 0, errors.New("invalid integer literal")
 				}
-				return IntExpr{Value: uint(v)}, len(expr), nil
+				return UintExpr{Value: uint(v)}, len(expr), nil
 			}
 		}
 
 		if !unicode.IsDigit(c) {
-			return IntExpr{}, 0, errors.New("expected digit")
+			return UintExpr{}, 0, errors.New("expected digit")
 		}
 	}
 
-	return IntExpr{}, len(expr), nil
+	return UintExpr{}, len(expr), nil
+}
+
+// Parse a boolean slice literal.
+func (ep ExprParser) parseBoolSliceExpr(expr string) (BoolSliceExpr, int, error) {
+	precondition(len(expr) > len("[]bool"))
+
+	consumed := len("[]bool")
+
+	// Consume the opening brace
+	if expr[consumed] != '{' {
+		return BoolSliceExpr{}, 0, errors.New("expected '{'")
+	}
+	consumed++
+
+	cb := func(token string) (Expr, int, error) {
+		if token == "true" {
+			return ep.parseTrueExpr(token)
+		} else if token == "false" {
+			return ep.parseFalseExpr(token)
+		} else {
+			return BoolSliceExpr{}, 0, errors.New("expected 'true' or 'false' for boolean literal")
+		}
+	}
+
+	exprs, n, err := ep.parseExpressionSequence(expr[consumed:], '}', cb)
+	if err != nil {
+		return BoolSliceExpr{}, 0, err
+	}
+	consumed += n
+
+	return BoolSliceExpr{Values: exprs}, consumed, nil
+}
+
+// Parse a string slice literal.
+func (ep ExprParser) parseStrSliceExpr(expr string) (StrSliceExpr, int, error) {
+	precondition(len(expr) > len("[]string"))
+
+	consumed := len("[]string")
+
+	// Consume the opening brace
+	if expr[consumed] != '{' {
+		return StrSliceExpr{}, 0, errors.New("expected '{'")
+	}
+	consumed++
+
+	cb := func(token string) (Expr, int, error) {
+		return ep.parseStringExpr(token)
+	}
+
+	exprs, n, err := ep.parseExpressionSequence(expr[consumed:], '}', cb)
+	if err != nil {
+		return StrSliceExpr{}, 0, err
+	}
+	consumed += n
+
+	return StrSliceExpr{Values: exprs}, consumed, nil
+}
+
+// Parse a uint slice literal.
+func (ep ExprParser) parseUintSliceExpr(expr string) (UintSliceExpr, int, error) {
+	precondition(len(expr) > len("[]uint"))
+
+	consumed := len("[]uint")
+
+	// Consume the opening brace
+	if expr[consumed] != '{' {
+		return UintSliceExpr{}, 0, errors.New("expected '{'")
+	}
+	consumed++
+
+	cb := func(token string) (Expr, int, error) {
+		return ep.parseUintExpr(token)
+	}
+
+	exprs, n, err := ep.parseExpressionSequence(expr[consumed:], '}', cb)
+	if err != nil {
+		return UintSliceExpr{}, 0, err
+	}
+	consumed += n
+
+	return UintSliceExpr{Values: exprs}, consumed, nil
+}
+
+// Parse a sequence of expressions separated by commas.
+func (ep ExprParser) parseExpressionSequence(expr string, terminator byte, tokenCb func(string) (Expr, int, error)) ([]Expr, int, error) {
+	consumed := 0
+
+	exprs := make([]Expr, 0)
+	vTerm := true
+	for {
+		if consumed >= len(expr) {
+			return nil, 0, errors.New("unexpected end of input")
+		}
+
+		// Consume the closing brace
+		if expr[consumed] == terminator {
+			if vTerm {
+				consumed++
+				break
+			} else {
+				return nil, 0, errors.New("invalid terminator for expression sequence")
+			}
+		}
+
+		// Consume commas
+		if expr[consumed] == ',' {
+			vTerm = false
+			consumed++
+			continue
+		}
+
+		// Consume whitespace
+		if expr[consumed] == ' ' {
+			vTerm = true
+			consumed++
+			continue
+		}
+
+		token, err := ep.nextToken(expr[consumed:])
+		if err != nil {
+			return nil, 0, err
+		}
+
+		newExpr, n, err := tokenCb(token)
+		if err != nil {
+			return nil, 0, err
+		}
+		consumed += n
+
+		exprs = append(exprs, newExpr)
+		vTerm = true
+	}
+
+	return exprs, consumed, nil
 }
 
 func (ep ExprParser) parseVariableRefExpr(expr string) (VariableRefExpr, int, error) {
@@ -257,7 +449,7 @@ func (ep ExprParser) parseStructFieldRefExpr(expr string) (StructFieldRefExpr, i
 
 // Determine if a character is a token terminator.
 func isTokenTerminator(c rune) bool {
-	return c == ' ' || c == ',' || c == ')' || c == '('
+	return c == ' ' || c == ',' || c == ')' || c == '(' || c == '}'
 }
 
 // Assert a precondition.

@@ -105,7 +105,7 @@ func TestEvalInt(t *testing.T) {
 		want        uint
 		expectError error
 	}{
-		{IntExpr{42}, 42, nil},
+		{UintExpr{42}, 42, nil},
 	}
 	for _, d := range data {
 		t.Run(fmt.Sprintf("%v", d.input), func(t *testing.T) {
@@ -149,12 +149,12 @@ func TestEvalEq(t *testing.T) {
 	}{
 		{EqExpr{StringExpr{"foo"}, StringExpr{"foo"}}, true, nil},
 		{EqExpr{StringExpr{"foo"}, StringExpr{"bar"}}, false, nil},
-		{EqExpr{IntExpr{42}, IntExpr{42}}, true, nil},
-		{EqExpr{IntExpr{42}, IntExpr{43}}, false, nil},
+		{EqExpr{UintExpr{42}, UintExpr{42}}, true, nil},
+		{EqExpr{UintExpr{42}, UintExpr{43}}, false, nil},
 		{EqExpr{TrueExpr{}, TrueExpr{}}, true, nil},
 		{EqExpr{TrueExpr{}, FalseExpr{}}, false, nil},
-		{EqExpr{StringExpr{"foo"}, IntExpr{42}}, false, errors.New("")},
-		{EqExpr{IntExpr{42}, StringExpr{"foo"}}, false, errors.New("")},
+		{EqExpr{StringExpr{"foo"}, UintExpr{42}}, false, errors.New("")},
+		{EqExpr{UintExpr{42}, StringExpr{"foo"}}, false, errors.New("")},
 		{EqExpr{TrueExpr{}, StringExpr{"foo"}}, false, errors.New("")},
 		{EqExpr{StringExpr{"foo"}, TrueExpr{}}, false, errors.New("")},
 	}

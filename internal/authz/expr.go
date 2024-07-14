@@ -1,6 +1,7 @@
 package authz
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -66,25 +67,157 @@ func (s StringExpr) Equal(other Expr) bool {
 }
 
 // ----------------------------------------------------------------------------
-// IntExpr
+// UintExpr
 // ----------------------------------------------------------------------------
 
-// IntExpr represents an integer literal.
-type IntExpr struct {
+// UintExpr represents an integer literal.
+type UintExpr struct {
 	Value uint
 }
 
-func (i IntExpr) Eval(env map[string]interface{}) (interface{}, error) {
+func (i UintExpr) Eval(env map[string]interface{}) (interface{}, error) {
 	return i.Value, nil
 }
 
-func (i IntExpr) Equal(other Expr) bool {
-	otherInt, ok := other.(IntExpr)
+func (i UintExpr) Equal(other Expr) bool {
+	otherInt, ok := other.(UintExpr)
 	if !ok {
 		return false
 	}
 
 	return i.Value == otherInt.Value
+}
+
+// ----------------------------------------------------------------------------
+// BoolSliceExpr
+// ----------------------------------------------------------------------------
+
+// BoolSliceExpr represents a boolean slice literal.
+type BoolSliceExpr struct {
+	Values []Expr
+}
+
+func (b BoolSliceExpr) Eval(env map[string]interface{}) (interface{}, error) {
+	var result []bool
+	for _, expr := range b.Values {
+		val, err := expr.Eval(env)
+		if err != nil {
+			return nil, err
+		}
+		boolVal, err := coerceBool(val)
+		if err != nil {
+			return nil, fmt.Errorf("unexpected type in boolean slice: %T", val)
+		}
+		result = append(result, boolVal)
+	}
+	return result, nil
+}
+
+func (b BoolSliceExpr) Equal(other Expr) bool {
+	otherBoolSlice, ok := other.(BoolSliceExpr)
+	if !ok {
+		return false
+	}
+
+	if len(b.Values) != len(otherBoolSlice.Values) {
+		return false
+	}
+
+	for i, expr := range b.Values {
+		if !expr.Equal(otherBoolSlice.Values[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// ----------------------------------------------------------------------------
+// StrSliceExpr
+// ----------------------------------------------------------------------------
+
+// Represents a string slice literal.
+type StrSliceExpr struct {
+	Values []Expr
+}
+
+func (s StrSliceExpr) Eval(env map[string]interface{}) (interface{}, error) {
+	var result []string
+	for _, expr := range s.Values {
+		val, err := expr.Eval(env)
+		if err != nil {
+			return nil, err
+		}
+		strVal, err := coerceStr(val)
+		if err != nil {
+			return nil, fmt.Errorf("unexpected type in string slice: %T", val)
+		}
+		result = append(result, strVal)
+	}
+	return result, nil
+}
+
+func (s StrSliceExpr) Equal(other Expr) bool {
+	otherStrSlice, ok := other.(StrSliceExpr)
+	if !ok {
+		return false
+	}
+
+	if len(s.Values) != len(otherStrSlice.Values) {
+		return false
+	}
+
+	for i, expr := range s.Values {
+		if !expr.Equal(otherStrSlice.Values[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// ----------------------------------------------------------------------------
+// UintSliceExpr
+// ----------------------------------------------------------------------------
+
+// Represents a uint slice literal.
+type UintSliceExpr struct {
+	Values []Expr
+}
+
+func (u UintSliceExpr) Eval(env map[string]interface{}) (interface{}, error) {
+	var result []uint
+	for _, expr := range u.Values {
+		val, err := expr.Eval(env)
+		if err != nil {
+			return nil, err
+		}
+		uintVal, err := coerceUint(val)
+		if err != nil {
+			return nil, fmt.Errorf("unexpected type in uint slice: %T", val)
+		}
+		result = append(result, uintVal)
+	}
+	return result, nil
+}
+
+func (u UintSliceExpr) Equal(other Expr) bool {
+	otherUintSlice, ok := other.(UintSliceExpr)
+	if !ok {
+		return false
+	}
+
+	if len(u.Values) != len(otherUintSlice.Values) {
+		return false
+	}
+
+	for i, expr := range u.Values {
+		if !expr.Equal(otherUintSlice.Values[i]) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // ----------------------------------------------------------------------------
@@ -299,3 +432,92 @@ func (s StructFieldRefExpr) Equal(other Expr) bool {
 
 	return s.VarName == otherValue.VarName && s.FieldName == otherValue.FieldName
 }
+
+// ----------------------------------------------------------------------------
+// InExpr
+// ----------------------------------------------------------------------------
+
+// An expression that represents the logic to determine if an element is a member of a slice.
+type InExpr struct {
+	Element    Expr
+	Collection Expr
+}
+
+func (i InExpr) Eval(params map[string]interface{}) (interface{}, error) {
+	// Resolve the collection
+	sliceVal, err := i.Collection.Eval(params)
+	if err != nil {
+		return nil, err
+	}
+
+	// Resolve the element
+	queryVal, err := i.Element.Eval(params)
+	if err != nil {
+		return nil, err
+	}
+
+	queryStr, err := coerceStr(queryVal)
+	if err == nil {
+		sliceStr, err := coerceStrSlice(sliceVal)
+		if err == nil {
+			for _, s := range sliceStr {
+				if s == queryStr {
+					return true, nil
+				}
+			}
+			return false, nil
+		} else {
+			return nil, errors.New("mismatched types for $in()")
+		}
+	}
+
+	queryUint, err := coerceUint(queryVal)
+	if err == nil {
+		sliceUint, err := coerceUintSlice(sliceVal)
+		if err == nil {
+			for _, u := range sliceUint {
+				if u == queryUint {
+					return true, nil
+				}
+			}
+			return false, nil
+		} else {
+			return nil, errors.New("mismatched types for $in()")
+		}
+	}
+
+	queryBool, err := coerceBool(queryVal)
+	if err == nil {
+		sliceBool, err := coerceBoolSlice(sliceVal)
+		if err == nil {
+			for _, u := range sliceBool {
+				if u == queryBool {
+					return true, nil
+				}
+			}
+			return false, nil
+		} else {
+			return nil, errors.New("mismatched types for $in()")
+		}
+	}
+
+	return nil, fmt.Errorf("unexpected type for $in() query")
+}
+
+func (i InExpr) Equal(other Expr) bool {
+	otherIn, ok := other.(InExpr)
+	if !ok {
+		return false
+	}
+	return i.Element.Equal(otherIn.Element) && i.Collection.Equal(otherIn.Collection)
+}
+
+// // Determine if any element of the slice satisfies the predicate.
+// func in[T comparable](e T, slice []T) bool {
+// 	for _, element := range slice {
+// 		if element == e {
+// 			return true
+// 		}
+// 	}
+// 	return false
+// }
