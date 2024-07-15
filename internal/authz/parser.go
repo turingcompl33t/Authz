@@ -207,7 +207,7 @@ func (ep ExprParser) parseNonOperator(expr string) (Expr, int, error) {
 
 		if len(expr) > len("[]bool") && expr[:len("[]bool")] == "[]bool" {
 			return ep.parseBoolSliceExpr(expr)
-		} else if len(expr) > len("[]string") && expr[:len("[]string")] == "[]string" {
+		} else if len(expr) > len("[]str") && expr[:len("[]str")] == "[]str" {
 			return ep.parseStrSliceExpr(expr)
 		} else if len(expr) > len("[]uint") && expr[:len("[]uint")] == "[]uint" {
 			return ep.parseUintSliceExpr(expr)
@@ -343,9 +343,9 @@ func (ep ExprParser) parseBoolSliceExpr(expr string) (BoolSliceExpr, int, error)
 
 // Parse a string slice literal expression.
 func (ep ExprParser) parseStrSliceExpr(expr string) (StrSliceExpr, int, error) {
-	precondition(len(expr) > len("[]string"))
+	precondition(len(expr) > len("[]str"))
 
-	consumed := len("[]string")
+	consumed := len("[]str")
 
 	// Consume the opening brace
 	if expr[consumed] != '{' {

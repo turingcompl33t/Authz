@@ -183,13 +183,13 @@ func TestParseStringSlice(t *testing.T) {
 		expectError error
 	}{
 		{"", nil, errors.New("")},
-		{"[]string{}", StrSliceExpr{[]Expr{}}, nil},
-		{"[]string{'foo'}", StrSliceExpr{[]Expr{StrExpr{"foo"}}}, nil},
-		{"[]string{'foo', 'bar'}", StrSliceExpr{[]Expr{StrExpr{"foo"}, StrExpr{"bar"}}}, nil},
-		{"[]string{'foo',}", nil, errors.New("")},
-		{"[]string{'foo", nil, errors.New("")},
-		{"[]string{1}", nil, errors.New("")},
-		{"[]string{true}", nil, errors.New("")},
+		{"[]str{}", StrSliceExpr{[]Expr{}}, nil},
+		{"[]str{'foo'}", StrSliceExpr{[]Expr{StrExpr{"foo"}}}, nil},
+		{"[]str{'foo', 'bar'}", StrSliceExpr{[]Expr{StrExpr{"foo"}, StrExpr{"bar"}}}, nil},
+		{"[]str{'foo',}", nil, errors.New("")},
+		{"[]str{'foo", nil, errors.New("")},
+		{"[]str{1}", nil, errors.New("")},
+		{"[]str{true}", nil, errors.New("")},
 	}
 	for _, d := range data {
 		t.Run(d.input, func(t *testing.T) {
