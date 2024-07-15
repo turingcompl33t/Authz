@@ -6,6 +6,19 @@ import (
 	"reflect"
 )
 
+// Evaluate the truthy-ness of a value.
+func truthy(v interface{}) (bool, error) {
+	if vStr, err := coerceStr(v); err == nil {
+		return vStr != "", nil
+	} else if vUint, err := coerceUint(v); err == nil {
+		return vUint > 0, nil
+	} else if vBool, err := coerceBool(v); err == nil {
+		return vBool, nil
+	} else {
+		return false, fmt.Errorf("cannot establish truthy-ness of value with type %v", reflect.TypeOf(v))
+	}
+}
+
 // Attempt to coerce a value to a string.
 func coerceStr(v interface{}) (string, error) {
 	if s, ok := v.(string); ok {

@@ -45,20 +45,20 @@ func (f FalseExpr) Equal(other Expr) bool {
 }
 
 // ----------------------------------------------------------------------------
-// StringExpr
+// StrExpr
 // ----------------------------------------------------------------------------
 
-// StringExpr represents a string literal.
-type StringExpr struct {
+// StrExpr represents a string literal.
+type StrExpr struct {
 	Value string
 }
 
-func (s StringExpr) Eval(env map[string]interface{}) (interface{}, error) {
+func (s StrExpr) Eval(env map[string]interface{}) (interface{}, error) {
 	return s.Value, nil
 }
 
-func (s StringExpr) Equal(other Expr) bool {
-	otherString, ok := other.(StringExpr)
+func (s StrExpr) Equal(other Expr) bool {
+	otherString, ok := other.(StrExpr)
 	if !ok {
 		return false
 	}
@@ -296,14 +296,13 @@ func (a AndExpr) Eval(env map[string]interface{}) (interface{}, error) {
 		if err != nil {
 			return false, err
 		}
-		if r == nil {
-			return false, nil
+
+		ok, err := truthy(r)
+		if err != nil {
+			return false, err
 		}
-		val, ok := r.(bool)
+
 		if !ok {
-			return false, nil
-		}
-		if !val {
 			return false, nil
 		}
 	}
@@ -344,14 +343,13 @@ func (o OrExpr) Eval(env map[string]interface{}) (interface{}, error) {
 		if err != nil {
 			return false, err
 		}
-		if r == nil {
-			return false, nil
+
+		ok, err := truthy(r)
+		if err != nil {
+			return false, err
 		}
-		val, ok := r.(bool)
-		if !ok {
-			return false, nil
-		}
-		if val {
+
+		if ok {
 			return true, nil
 		}
 	}

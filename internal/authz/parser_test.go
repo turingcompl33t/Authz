@@ -56,7 +56,7 @@ func TestParseString(t *testing.T) {
 		expectError error
 	}{
 		{"", nil, errors.New("")},
-		{"'foo'", StringExpr{"foo"}, nil},
+		{"'foo'", StrExpr{"foo"}, nil},
 		{"'foo", nil, errors.New("")},
 		{"'foo',", nil, errors.New("")},
 		{"'foo' ", nil, errors.New("")},
@@ -184,8 +184,8 @@ func TestParseStringSlice(t *testing.T) {
 	}{
 		{"", nil, errors.New("")},
 		{"[]string{}", StrSliceExpr{[]Expr{}}, nil},
-		{"[]string{'foo'}", StrSliceExpr{[]Expr{StringExpr{"foo"}}}, nil},
-		{"[]string{'foo', 'bar'}", StrSliceExpr{[]Expr{StringExpr{"foo"}, StringExpr{"bar"}}}, nil},
+		{"[]string{'foo'}", StrSliceExpr{[]Expr{StrExpr{"foo"}}}, nil},
+		{"[]string{'foo', 'bar'}", StrSliceExpr{[]Expr{StrExpr{"foo"}, StrExpr{"bar"}}}, nil},
 		{"[]string{'foo',}", nil, errors.New("")},
 		{"[]string{'foo", nil, errors.New("")},
 		{"[]string{1}", nil, errors.New("")},
@@ -273,12 +273,145 @@ func TestParseEq(t *testing.T) {
 		{"", nil, errors.New("")},
 		{"$eq(true, true)", EqExpr{TrueExpr{}, TrueExpr{}}, nil},
 		{"$eq(true, false)", EqExpr{TrueExpr{}, FalseExpr{}}, nil},
-		{"$eq(true, 'foo')", EqExpr{TrueExpr{}, StringExpr{"foo"}}, nil},
+		{"$eq(true, 'foo')", EqExpr{TrueExpr{}, StrExpr{"foo"}}, nil},
 		{"$eq(true, 123)", EqExpr{TrueExpr{}, UintExpr{123}}, nil},
 		{"$eq(", nil, errors.New("")},
 		{"$eq(true", nil, errors.New("")},
 		{"$eq(true),", nil, errors.New("")},
 		{"$eq() ", nil, errors.New("")},
+	}
+	for _, d := range data {
+		t.Run(d.input, func(t *testing.T) {
+			b := ExprParser{}
+			got, err := b.Parse(d.input)
+
+			if err != nil {
+				if d.expectError == nil {
+					t.Fatalf("unexpected error: %v", err)
+				} else {
+					return
+				}
+			}
+
+			if d.expectError != nil {
+				if err == nil {
+					t.Fatalf("expected error: %v", d.expectError)
+				} else {
+					return
+				}
+			}
+
+			if !got.Equal(d.want) {
+				t.Fatalf("got %v, want %v", got, d.want)
+			}
+		})
+	}
+}
+
+// ExprParser can parse $in expressions.
+func TestParseIn(t *testing.T) {
+	data := []struct {
+		input       string
+		want        Expr
+		expectError error
+	}{
+		{"", nil, errors.New("")},
+		{"$in(1, []uint{1, 2})", InExpr{UintExpr{1}, UintSliceExpr{[]Expr{UintExpr{1}, UintExpr{2}}}}, nil},
+		{"$in(true, []bool{true, false})", InExpr{TrueExpr{}, BoolSliceExpr{[]Expr{TrueExpr{}, FalseExpr{}}}}, nil},
+		{"$in('foo', []string{'foo', 'bar'})", InExpr{StrExpr{"foo"}, StrSliceExpr{[]Expr{StrExpr{"foo"}, StrExpr{"bar"}}}}, nil},
+		{"$in(", nil, errors.New("")},
+	}
+	for _, d := range data {
+		t.Run(d.input, func(t *testing.T) {
+			b := ExprParser{}
+			got, err := b.Parse(d.input)
+
+			if err != nil {
+				if d.expectError == nil {
+					t.Fatalf("unexpected error: %v", err)
+				} else {
+					return
+				}
+			}
+
+			if d.expectError != nil {
+				if err == nil {
+					t.Fatalf("expected error: %v", d.expectError)
+				} else {
+					return
+				}
+			}
+
+			if !got.Equal(d.want) {
+				t.Fatalf("got %v, want %v", got, d.want)
+			}
+		})
+	}
+}
+
+// ExprParser can parse AND expressions.
+func TestParseAnd(t *testing.T) {
+	data := []struct {
+		input       string
+		want        Expr
+		expectError error
+	}{
+		{"", nil, errors.New("")},
+		{"$and(true, true)", AndExpr{[]Expr{TrueExpr{}, TrueExpr{}}}, nil},
+		{"$and(true, false)", AndExpr{[]Expr{TrueExpr{}, FalseExpr{}}}, nil},
+		{"$and(1, 2)", AndExpr{[]Expr{UintExpr{1}, UintExpr{2}}}, nil},
+		{"$and('foo', 'bar')", AndExpr{[]Expr{StrExpr{"foo"}, StrExpr{"bar"}}}, nil},
+		{"$and(", nil, errors.New("")},
+		{"$and(true", nil, errors.New("")},
+		{"$and(true),", nil, errors.New("")},
+		{"$and()", AndExpr{[]Expr{}}, nil},
+		{"$and() ", nil, errors.New("")},
+	}
+	for _, d := range data {
+		t.Run(d.input, func(t *testing.T) {
+			b := ExprParser{}
+			got, err := b.Parse(d.input)
+
+			if err != nil {
+				if d.expectError == nil {
+					t.Fatalf("unexpected error: %v", err)
+				} else {
+					return
+				}
+			}
+
+			if d.expectError != nil {
+				if err == nil {
+					t.Fatalf("expected error: %v", d.expectError)
+				} else {
+					return
+				}
+			}
+
+			if !got.Equal(d.want) {
+				t.Fatalf("got %v, want %v", got, d.want)
+			}
+		})
+	}
+}
+
+// ExprParser can parse OR expressions.
+func TestParseOr(t *testing.T) {
+	data := []struct {
+		input       string
+		want        Expr
+		expectError error
+	}{
+		{"", nil, errors.New("")},
+		{"$or(true, true)", OrExpr{[]Expr{TrueExpr{}, TrueExpr{}}}, nil},
+		{"$or(true, false)", OrExpr{[]Expr{TrueExpr{}, FalseExpr{}}}, nil},
+		{"$or(1, 2)", OrExpr{[]Expr{UintExpr{1}, UintExpr{2}}}, nil},
+		{"$or('foo', 'bar')", OrExpr{[]Expr{StrExpr{"foo"}, StrExpr{"bar"}}}, nil},
+		{"$or(", nil, errors.New("")},
+		{"$or(true", nil, errors.New("")},
+		{"$or(true),", nil, errors.New("")},
+		{"$or()", OrExpr{[]Expr{}}, nil},
+		{"$or() ", nil, errors.New("")},
 	}
 	for _, d := range data {
 		t.Run(d.input, func(t *testing.T) {

@@ -6,6 +6,47 @@ import (
 	"testing"
 )
 
+// Truth evalutation works as expected.
+func TestTruthy(t *testing.T) {
+	data := []struct {
+		input       interface{}
+		expect      bool
+		expectError error
+	}{
+		{"hello", true, nil},
+		{"", false, nil},
+		{1, true, nil},
+		{0, false, nil},
+		{true, true, nil},
+		{false, false, nil},
+		{nil, false, errors.New("")},
+	}
+	for _, d := range data {
+		t.Run(fmt.Sprintf("%v", d.input), func(t *testing.T) {
+			got, err := truthy(d.input)
+			if err != nil {
+				if d.expectError == nil {
+					t.Fatalf("unexpected error: %v", err)
+				} else {
+					return
+				}
+			}
+
+			if d.expectError != nil {
+				if err == nil {
+					t.Fatalf("expected error: %v", d.expectError)
+				} else {
+					return
+				}
+			}
+
+			if got != d.expect {
+				t.Fatalf("got %v, want %v", got, d.expect)
+			}
+		})
+	}
+}
+
 // Coercion to slice of string works as expected.
 func TestCoerceStringSlice(t *testing.T) {
 	data := []struct {
